@@ -452,7 +452,7 @@ BOOL drive_file_read(DRIVE_FILE* file, wStream* s, UINT64 Offset, UINT32* Length
 	DEBUG_WSTR("Read file %s", file->fullpath);
 
 	DWORD sizeHigh = 0;
-	const DWORD sizeLow = GetFileSize(file, &sizeHigh);
+	const DWORD sizeLow = GetFileSize(file->file_handle, &sizeHigh);
 	const UINT64 size64 = 1ull * sizeLow + ((1ull * sizeHigh) << 32);
 	if (Offset > size64)
 	{
