@@ -260,6 +260,7 @@ static UINT drive_process_irp_close(DRIVE_DEVICE* drive, IRP* irp)
 		irp->IoStatus = STATUS_UNSUCCESSFUL;
 	else
 	{
+		SetLastError(ERROR_SUCCESS);
 		ListDictionary_Remove(drive->files, key);
 		irp->IoStatus = drive_map_windows_err(GetLastError());
 	}
