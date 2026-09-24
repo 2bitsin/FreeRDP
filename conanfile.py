@@ -144,6 +144,8 @@ class FreeRDPConan(ConanFile):
 
   def package_info(self):
     self.cpp_info.set_property("cmake_file_name", "FreeRDP")
+    # The aggregate would otherwise take freerdp::freerdp, the core library's own target.
+    self.cpp_info.set_property("cmake_target_name", "FreeRDP::FreeRDP")
     codecs = ["zlib::zlib"] + (["openh264::openh264"] if self.options.with_openh264 else [])
     self._component("winpr", "winpr", ["openssl::ssl", "openssl::crypto"], ["pthread", "dl", "rt", "m"])
     self._component("freerdp", "freerdp", ["winpr", *codecs], ["m"])
