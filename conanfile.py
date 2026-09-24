@@ -55,12 +55,12 @@ class FreeRDPConan(ConanFile):
     cmake_layout(self)
 
   def requirements(self):
-    # A shared FreeRDP over static OpenSSL or OpenH264 would carry and export private copies of them.
-    linkage = {"shared": bool(self.options.shared)}
-    self.requires("openssl/[>=3.6 <4]", options=linkage)
+    # A shared FreeRDP over a static OpenSSL would carry a private libcrypto per library.
+    self.requires("openssl/[>=3.6 <4]", options={"shared": bool(self.options.shared)})
     self.requires("zlib/[>=1.3 <2]")
     if self.options.with_openh264:
-      self.requires("openh264/[>=2.6 <3]", options=linkage)
+      # Static and hidden in libfreerdp: a consumer's rpath never names a dependency it does not link.
+      self.requires("openh264/[>=2.6 <3]", options={"shared": False})
     if self.options.x11:
       self.requires("xorg/system")
     if self.options.wayland:
@@ -115,12 +115,19 @@ class FreeRDPConan(ConanFile):
       "CHANNEL_TSMF": False,
     })
     if self.options.with_openh264:
-      tc.cache_variables["OPENH264_ROOT"] = self.dependencies["openh264"].package_folder
+      tc.variables.update(self._openh264_variables())
+    if self.options.shared:
+      tc.extra_sharedlinkflags.append("-Wl,--exclude-libs,ALL")
     tc.generate()
     deps = CMakeDeps(self)
-    # FreeRDP's FindOpenH264 reads OPENH264_* variables that conan's config does not set.
+    # FreeRDP's FindOpenH264 takes the OPENH264_* cache entries above; conan's config would shadow it.
     deps.set_property("openh264", "cmake_find_mode", "none")
     deps.generate()
+
+  def _openh264_variables(self):
+    info = self.dependencies["openh264"].cpp_info.aggregated_components()
+    archives = [str(Path(info.libdirs[0], f"lib{lib}.a")) for lib in info.libs]
+    return {"OPENH264_INCLUDE_DIR": info.includedirs[0], "OPENH264_LIBRARY": ";".join(archives + info.system_libs)}
 
   def build(self):
     cmake = CMake(self)
