@@ -100,6 +100,8 @@ class FreeRDPConan(ConanFile):
       "WITH_SYSTEMD": False,
       "WITH_JSON_DISABLED": True,
       "WITH_UNICODE_BUILTIN": True,
+      "WITH_INTERNAL_MD4": True,
+      "WITH_INTERNAL_RC4": True,
       "WITH_ABSOLUTE_PLUGIN_LOAD_PATHS": False,
       "WITH_WINPR_TOOLS": False,
       "WITH_MANPAGES": False,
