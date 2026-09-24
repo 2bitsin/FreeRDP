@@ -35,7 +35,7 @@ class FreeRDPConan(ConanFile):
     "sample": False,
     "with_openh264": True,
   }
-  exports_sources = ("*", "!.git/**", "!build/**", "!ci/**", "!docs/**", "!packaging/**")
+  exports_sources = ("*", "!.git/**", "!build/**", "!ci/**", "!docs/**", "!packaging/**", "!test_package/**")
 
   def set_version(self):
     text = Path(self.recipe_folder, "cmake", "GetProjectVersion.cmake").read_text()
