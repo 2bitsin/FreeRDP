@@ -155,7 +155,7 @@ class FreeRDPConan(ConanFile):
   def _component(self, name, headers, requires, system_libs):
     major = Version(self.version).major
     component = self.cpp_info.components[name]
-    component.set_property("cmake_target_name", name)
+    component.set_property("cmake_target_aliases", [name])
     component.libs = [f"{name}{major}"]
     component.includedirs = [f"include/{headers}{major}"]
     component.requires = requires
