@@ -23,6 +23,16 @@ commit on branch `sdl-rdp` above `3.32.0`; releases are tagged
   instead of loaded from OpenSSL's legacy provider, which conan's shared
   OpenSSL cannot find at run time; without them every NLA logon fails.
 
+- `conanfile.py`, `CMakeCPack.cmake` (`3.32.0-sdl-rdp.2`): the recipe builds
+  for macOS arm64 and Windows msvc as well as Linux. `-Wl,--exclude-libs,ALL`
+  is ELF-only; Apple targets hide OpenH264 with `-Wl,-load_hidden,<archive>`,
+  Windows exports only what is declared. The archive name follows the
+  openh264 recipe (`openh264.lib` under msvc and clang-cl). System libraries
+  are per OS: Windows winpr links upstream's eight public Win32 libraries,
+  Apple has no librt, everything else keeps `pthread dl rt m`. CPack's
+  `InstallRequiredSystemLibraries` runs only on a Windows host, so a cross
+  build configures. A worktree's `.git` file is never exported.
+
 ## Fixes
 
 - `winpr/libwinpr/utils/ssl.c`: do not load OpenSSL's legacy provider when
