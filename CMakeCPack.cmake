@@ -59,7 +59,7 @@ set(CPACK_NSIS_MUI_UNICON "${PROJECT_SOURCE_DIR}/resource\\\\FreeRDP_Icon_96px.i
 
 set(CPACK_COMPONENTS_ALL client server libraries headers symbols tools)
 
-if(MSVC)
+if(MSVC AND CMAKE_HOST_WIN32)
   string(FIND ${CMAKE_MSVC_RUNTIME_LIBRARY} "DLL" IS_SHARED)
 
   if(NOT IS_SHARED STREQUAL "-1")

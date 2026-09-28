@@ -2,8 +2,10 @@ import re
 from pathlib import Path
 
 from conan import ConanFile
+from conan.tools.apple import is_apple_os
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 from conan.tools.files import copy, rmdir
+from conan.tools.microsoft import is_msvc
 from conan.tools.scm import Version
 
 
@@ -35,7 +37,7 @@ class FreeRDPConan(ConanFile):
     "sample": False,
     "with_openh264": True,
   }
-  exports_sources = ("*", "!.git/**", "!build/**", "!ci/**", "!docs/**", "!packaging/**", "!test_package/**")
+  exports_sources = ("*", "!.git", "!.git/**", "!build/**", "!ci/**", "!docs/**", "!packaging/**", "!test_package/**")
 
   def set_version(self):
     text = Path(self.recipe_folder, "cmake", "GetProjectVersion.cmake").read_text()
@@ -119,17 +121,35 @@ class FreeRDPConan(ConanFile):
     if self.options.with_openh264:
       tc.variables.update(self._openh264_variables())
     if self.options.shared:
-      tc.extra_sharedlinkflags.append("-Wl,--exclude-libs,ALL")
+      tc.extra_sharedlinkflags.extend(self._hiding_link_flags())
     tc.generate()
     deps = CMakeDeps(self)
     # FreeRDP's FindOpenH264 takes the OPENH264_* cache entries above; conan's config would shadow it.
     deps.set_property("openh264", "cmake_find_mode", "none")
     deps.generate()
 
+  def _openh264_archives(self):
+    info = self.dependencies["openh264"].cpp_info.aggregated_components()
+    # openh264's recipe renames its static archive to openh264.lib under msvc and clang-cl.
+    msvc_like = is_msvc(self) or (self.settings.os == "Windows" and self.settings.compiler == "clang")
+    name = "{}.lib" if msvc_like else "lib{}.a"
+    return [str(Path(info.libdirs[0], name.format(lib))) for lib in info.libs]
+
   def _openh264_variables(self):
     info = self.dependencies["openh264"].cpp_info.aggregated_components()
-    archives = [str(Path(info.libdirs[0], f"lib{lib}.a")) for lib in info.libs]
-    return {"OPENH264_INCLUDE_DIR": info.includedirs[0], "OPENH264_LIBRARY": ";".join(archives + info.system_libs)}
+    return {
+      "OPENH264_INCLUDE_DIR": info.includedirs[0],
+      "OPENH264_LIBRARY": ";".join(self._openh264_archives() + info.system_libs),
+    }
+
+  def _hiding_link_flags(self):
+    # --exclude-libs is ELF-only; ld64 hides per archive; a DLL exports only what is declared.
+    if self.settings.os == "Windows":
+      return []
+    if is_apple_os(self):
+      archives = self._openh264_archives() if self.options.with_openh264 else []
+      return [f"-Wl,-load_hidden,{archive}" for archive in archives]
+    return ["-Wl,--exclude-libs,ALL"]
 
   def build(self):
     cmake = CMake(self)
@@ -147,12 +167,23 @@ class FreeRDPConan(ConanFile):
     # The aggregate would otherwise take freerdp::freerdp, the core library's own target.
     self.cpp_info.set_property("cmake_target_name", "FreeRDP::FreeRDP")
     codecs = ["zlib::zlib"] + (["openh264::openh264"] if self.options.with_openh264 else [])
-    self._component("winpr", "winpr", ["openssl::ssl", "openssl::crypto"], ["pthread", "dl", "rt", "m"])
-    self._component("freerdp", "freerdp", ["winpr", *codecs], ["m"])
+    system_libs = self._system_libs()
+    self._component("winpr", "winpr", ["openssl::ssl", "openssl::crypto"], system_libs["winpr"])
+    self._component("freerdp", "freerdp", ["winpr", *codecs], system_libs["freerdp"])
     if self.options.client:
       self._component("freerdp-client", "freerdp", ["freerdp", "winpr"], [])
     if self.options.server:
       self._component("freerdp-server", "freerdp", ["freerdp", "winpr"], [])
+
+  def _system_libs(self):
+    # winpr's WINPR_LIBS_PUBLIC; shlwapi and pathcch under MSVC OR MINGW (winpr/libwinpr/path/CMakeLists.txt:27-30).
+    if self.settings.os == "Windows":
+      msvc_or_mingw = self.settings.compiler in ("msvc", "clang", "gcc")
+      shell = ["shlwapi", "pathcch"] if msvc_or_mingw else []
+      return {"winpr": ["ws2_32", "rpcrt4", "crypt32", "ncrypt", "ntdsapi", "dbghelp", *shell], "freerdp": []}
+    if is_apple_os(self):
+      return {"winpr": ["pthread", "dl", "m"], "freerdp": ["m"]}
+    return {"winpr": ["pthread", "dl", "rt", "m"], "freerdp": ["m"]}
 
   def _component(self, name, headers, requires, system_libs):
     major = Version(self.version).major
