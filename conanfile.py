@@ -9,6 +9,10 @@ from conan.tools.microsoft import is_msvc
 from conan.tools.scm import Version
 
 
+# This fork's release over the upstream version; the recipe version and the git tag are <upstream>-<FORK_RELEASE>.
+FORK_RELEASE = "sdl-rdp.3"
+
+
 class FreeRDPConan(ConanFile):
   name = "freerdp"
   license = "Apache-2.0"
@@ -41,7 +45,8 @@ class FreeRDPConan(ConanFile):
 
   def set_version(self):
     text = Path(self.recipe_folder, "cmake", "GetProjectVersion.cmake").read_text()
-    self.version = re.search(r'set\(RAW_VERSION_STRING "([^"]+)"\)', text).group(1)
+    upstream = re.search(r'set\(RAW_VERSION_STRING "([^"]+)"\)', text).group(1)
+    self.version = f"{upstream}-{FORK_RELEASE}"
 
   def config_options(self):
     if self.settings.os == "Windows":

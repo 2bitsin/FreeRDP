@@ -43,3 +43,11 @@ commit on branch `sdl-rdp` above `3.32.0`; releases are tagged
 - `channels/drive/client/drive_main.c`: clear the thread's last error before
   closing a file, so a close after a finished directory listing no longer
   reports `STATUS_NO_MORE_FILES`.
+- `libfreerdp/core/listener.c` (`3.32.0-sdl-rdp.3`): a server that opens
+  its own listening socket can hand it to FreeRDP on Windows too.
+  `freerdp_listener_open_from_socket` returned `FALSE` under `_WIN32`; it
+  now switches the socket to non-blocking with `ioctlsocket(FIONBIO)` where
+  POSIX uses `fcntl(O_NONBLOCK)`, checks `WSAEventSelect`, and stores the
+  socket and its event only once both succeeded, so a failed adoption leaves
+  the socket with its caller. The recipe version carries the fork release
+  (`3.32.0-sdl-rdp.<n>`), so a consumer pins a release by version.

@@ -316,7 +316,6 @@ static BOOL freerdp_listener_open_local(freerdp_listener* instance, const char* 
 
 static BOOL freerdp_listener_open_from_socket(freerdp_listener* instance, int fd)
 {
-#ifndef _WIN32
 	rdpListener* listener = (rdpListener*)instance->listener;
 
 	if (listener->num_sockfds == MAX_LISTENER_HANDLES)
@@ -325,24 +324,42 @@ static BOOL freerdp_listener_open_from_socket(freerdp_listener* instance, int fd
 		return FALSE;
 	}
 
+#ifndef _WIN32
 	if (fcntl(fd, F_SETFL, O_NONBLOCK) < 0)
+	{
+		WLog_ERR(TAG, "fcntl(fd, F_SETFL, O_NONBLOCK)");
 		return FALSE;
+	}
+#else
+	u_long arg = 1;
+
+	if (ioctlsocket((SOCKET)fd, FIONBIO, &arg) != 0)
+	{
+		WLog_ERR(TAG, "ioctlsocket(fd, FIONBIO)");
+		return FALSE;
+	}
+#endif
+
+	HANDLE hevent = WSACreateEvent();
+
+	if (!hevent)
+	{
+		WLog_ERR(TAG, "failed to create sockfd event");
+		return FALSE;
+	}
+
+	if (WSAEventSelect((SOCKET)fd, hevent, FD_READ | FD_ACCEPT | FD_CLOSE) != 0)
+	{
+		WLog_ERR(TAG, "WSAEventSelect");
+		(void)CloseHandle(hevent);
+		return FALSE;
+	}
 
 	listener->sockfds[listener->num_sockfds] = fd;
-	listener->events[listener->num_sockfds] = WSACreateEvent();
-
-	if (!listener->events[listener->num_sockfds])
-		return FALSE;
-
-	WSAEventSelect((SOCKET)fd, listener->events[listener->num_sockfds],
-	               FD_READ | FD_ACCEPT | FD_CLOSE);
-
+	listener->events[listener->num_sockfds] = hevent;
 	listener->num_sockfds++;
 	WLog_INFO(TAG, "Listening on socket %d.", fd);
 	return TRUE;
-#else
-	return FALSE;
-#endif
 }
 
 static void freerdp_listener_close(freerdp_listener* instance)
